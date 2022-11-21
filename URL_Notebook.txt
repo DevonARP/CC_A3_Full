@@ -1,0 +1,8 @@
+https://github.com/aws-samples/reinvent2018-srv404-lambda-sagemaker/blob/master/training/README.md
+
+Have to add email identities and domaind to ses and verify them
+Have to activate ses rule
+Have to run notebook instance to create the model, endpoint, and endpoint config
+Have to submit code to lambda as zip file of just the code file
+Have to change endpoint name in code
+Have to add cname files to domain

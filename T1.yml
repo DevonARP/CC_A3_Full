@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ""
+Resources:
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "L1-role-yq1upfdx"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicy
+              - "arn:aws:iam::aws:policy/AmazonSESFullAccess"
+              - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+              - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+
+    IAMRole2:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "AmazonSageMaker-ExecutionRole-20221119T203835"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sagemaker.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicy2
+              - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+            Description: "SageMaker execution role created from the SageMaker AWS Management Console."
+
+    IAMRole3:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "AmazonSageMaker-ExecutionRole-20221117T162252"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sagemaker.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicy3
+              - "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+            Description: "SageMaker execution role created from the SageMaker AWS Management Console."
+
+    IAMManagedPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "AWSLambdaBasicExecutionRole-06c20176-141c-4b39-9837-2b50a117e2d8"
+            Path: "/service-role/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "logs:CreateLogGroup",
+                            "Resource": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": [
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/L1:*"
+                            ]
+                        }
+                    ]
+                }
+
+    IAMManagedPolicy2:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "AmazonSageMaker-ExecutionPolicy-20221119T203835"
+            Path: "/service-role/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "s3:ListBucket"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:s3:::smlambda-workshop-ap-nyu2"
+                            ]
+                        },
+                        {
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:PutObject",
+                                "s3:DeleteObject"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:s3:::smlambda-workshop-ap-nyu2/*"
+                            ]
+                        }
+                    ]
+                }
+
+    IAMManagedPolicy3:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "AmazonSageMaker-ExecutionPolicy-20221117T162252"
+            Path: "/service-role/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:PutObject",
+                                "s3:DeleteObject",
+                                "s3:ListBucket"
+                            ],
+                            "Resource": [
+                                "arn:aws:s3:::*"
+                            ]
+                        }
+                    ]
+                }
+
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        DependsOn:
+        - IAMRole
+        Properties:
+            Description: ""
+            FunctionName: "L1"
+            Handler: "lambda_function.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Code: 
+                ZipFile: |
+                    def handler(event, context):
+                        print('hello from lambda')
+            MemorySize: 128
+            Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/L1-role-yq1upfdx"
+            Runtime: "python3.9"
+            Timeout: 3
+            TracingConfig: 
+                Mode: "PassThrough"
+            Layers: 
+              - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p39-numpy:9"
+            EphemeralStorage: 
+                Size: 512
+
+    LambdaPermission:
+        Type: "AWS::Lambda::Permission"
+        DependsOn:
+        - LambdaFunction
+        Properties:
+            Action: "lambda:InvokeFunction"
+            FunctionName: !GetAtt LambdaFunction.Arn
+            Principal: "s3.amazonaws.com"
+            SourceArn: "arn:aws:s3:::s1-ap-nyu2"
+            
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        DependsOn:
+        - LambdaPermission
+        Properties:
+            BucketName: "s1-ap-nyu2"
+            NotificationConfiguration: 
+                LambdaConfigurations: 
+                  - 
+                    Event: "s3:ObjectCreated:*"
+                    Function: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:L1"
+
+    S3Bucket2:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: "smlambda-workshop-ap-nyu2"
+            VersioningConfiguration: 
+                Status: "Enabled"
+
+    S3BucketPolicy:
+        Type: "AWS::S3::BucketPolicy"
+        Properties:
+            Bucket: !Ref S3Bucket
+            PolicyDocument: 
+                Version: "2012-10-17"
+                Statement: 
+                  - 
+                    Sid: "AllowSESPuts"
+                    Effect: "Allow"
+                    Principal: 
+                        Service: "ses.amazonaws.com"
+                    Action: "s3:PutObject"
+                    Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+
+    SageMakerNotebookInstance:
+        Type: "AWS::SageMaker::NotebookInstance"
+        DependsOn:
+        - IAMRole
+        Properties:
+            NotebookInstanceName: "notebook-instance-ap"
+            InstanceType: "ml.t2.medium"
+            RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/AmazonSageMaker-ExecutionRole-20221119T203835"
+            DirectInternetAccess: "Enabled"
+            VolumeSizeInGB: 5
+            RootAccess: "Enabled"
+
+    SESReceiptRuleSet:
+        Type: "AWS::SES::ReceiptRuleSet"
+        Properties:
+            RuleSetName: "A3"
+
+    SESReceiptRule:
+        Type: "AWS::SES::ReceiptRule"
+        DependsOn:
+        - SESReceiptRuleSet
+        - S3BucketPolicy
+        Properties:
+            Rule: 
+                ScanEnabled: false
+                Recipients: 
+                  - "apoonai@anilp.info"
+                Actions: 
+                  - 
+                    S3Action: 
+                        BucketName: !Ref S3Bucket
+                Enabled: true
+                Name: "A3"
+                TlsPolicy: "Optional"
+            RuleSetName: "A3"
+
+
